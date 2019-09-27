@@ -7,7 +7,8 @@ import com.evai.component.cache.exception.IllegalKeyIdException;
 import com.evai.component.cache.utils.CacheKeyUtil;
 import com.evai.component.utils.BeanUtil;
 import com.evai.component.utils.CommonUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.evai.component.utils.JacksonUtil;
+import com.fasterxml.jackson.databind.JavaType;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ArrayUtils;
@@ -19,6 +20,12 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author crh
@@ -45,7 +52,19 @@ public class CacheAbleAspect {
 
         int expiredSeconds = cacheKeyUtil.randomExpired(expired);
 
-        return cacheComponent.getCache(assembleFinalCacheKey(pjp, cacheAble, methodSignature), expiredSeconds, asyncSeconds, new TypeReference<T>() {}, () -> this.proceed(pjp));
+        // 方法返回类型
+        Class returnType = methodSignature.getReturnType();
+
+        JavaType javaType;
+        if (Map.class.equals(returnType) || List.class.equals(returnType) || Set.class.equals(returnType)) {
+            Type[] types = BeanUtil.getMethodGenericClass(methodSignature);
+            Class[] classes = BeanUtil.toArray(types, Class.class);
+            javaType = JacksonUtil.getJavaType(returnType, classes);
+        } else {
+            javaType = JacksonUtil.getJavaType(returnType);
+        }
+
+        return cacheComponent.getCache(assembleFinalCacheKey(pjp, cacheAble, methodSignature), expiredSeconds, asyncSeconds, javaType, () -> this.proceed(pjp));
     }
 
     /**

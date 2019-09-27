@@ -11,6 +11,7 @@ import com.evai.component.mybatis.BaseEntity;
 import com.evai.component.mybatis.utils.ReflectUtil;
 import com.evai.component.utils.BeanUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
 import com.google.common.collect.Lists;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +44,7 @@ import java.util.function.Supplier;
 public class CacheComponent {
 
     private final RedisService redisService;
-    private final CacheKeyBean cacheKeyBean;
+    private final CacheKeyConfig cacheKeyConfig;
     private final RedisTemplate<String, String> redisTemplate;
     private final CacheKeyUtil cacheKeyUtil;
     private final RedisLock redisLock;
@@ -119,13 +120,13 @@ public class CacheComponent {
      * 同时检查该缓存是否即将到期，并延长过期时间，防止缓存穿透
      *
      * @param key
-     * @param typeReference
+     * @param javaType
      * @param seconds
      * @param supplier
      * @param <T>
      * @return
      */
-    public <T> T getCache(String key, int seconds, int asyncSeconds, TypeReference<T> typeReference, Supplier<T> supplier) {
+    public <T> T getCache(String key, int seconds, int asyncSeconds, JavaType javaType, Supplier<T> supplier) {
         String value = redisService.get(key);
         // 缓存值不存在或已失效
         if (value == null) {
@@ -147,7 +148,7 @@ public class CacheComponent {
             if (StringUtils.equals(value, CacheConstant.NULL)) {
                 return null;
             }
-            return BeanUtil.stringToBean(value, typeReference);
+            return BeanUtil.stringToBean(value, javaType);
         }
     }
 
@@ -166,7 +167,7 @@ public class CacheComponent {
             throw new IllegalParamException("无效的查询方法返回类型，请指定具体实体类");
         }
         // 通过条件key查询到主键key
-        String primaryKey = redisService.get(cacheKeyDTO.getConditionKey());
+        String primaryKey = redisService.get(cacheKeyDTO.getIndexKey());
         // 不存在或已失效
         if (primaryKey == null) {
             return getEntityResult(cacheKeyDTO, seconds, cacheAbleEntity, supplier);
@@ -184,9 +185,9 @@ public class CacheComponent {
             }
             // 如果到期时间 < 设置的到期时间，更新缓存数据，防止缓存穿透
             Long primaryKeyExpired = redisService.getExpire(primaryKey, TimeUnit.SECONDS);
-            Long conditionKeyExpired = redisService.getExpire(cacheKeyDTO.getConditionKey(), TimeUnit.SECONDS);
+            Long conditionKeyExpired = redisService.getExpire(cacheKeyDTO.getIndexKey(), TimeUnit.SECONDS);
             if (conditionKeyExpired == null || conditionKeyExpired < asyncSeconds) {
-                redisService.expire(cacheKeyDTO.getConditionKey(), seconds, TimeUnit.SECONDS);
+                redisService.expire(cacheKeyDTO.getIndexKey(), seconds, TimeUnit.SECONDS);
             }
             if (primaryKeyExpired == null || primaryKeyExpired < asyncSeconds) {
                 // 异步更新方法
@@ -242,15 +243,15 @@ public class CacheComponent {
         String primaryKey = null;
         // 这里存条件key，值为主键key
         if (result == null) {
-            setNullValue(cacheKeyDTO.getConditionKey());
+            setNullValue(cacheKeyDTO.getIndexKey());
             return null;
         } else if (cacheKeyDTO.getPrimaryKey() != null) {
             primaryKey = cacheKeyDTO.getPrimaryKey();
         } else {
             Serializable id = ReflectUtil.getPrimaryValue(result);
             if (id != null) {
-                String keyPrefix = StringUtils.isNotBlank(cacheAbleEntity.keyNamePrefix()) ? cacheAbleEntity.keyNamePrefix() : cacheKeyBean.getKeyNamePrefix();
-                String keySuffix = StringUtils.isNotBlank(cacheAbleEntity.keyNameSuffix()) ? cacheAbleEntity.keyNameSuffix() : cacheKeyBean.getKeyNameSuffix();
+                String keyPrefix = StringUtils.isNotBlank(cacheAbleEntity.keyNamePrefix()) ? cacheAbleEntity.keyNamePrefix() : cacheKeyConfig.getKeyNamePrefix();
+                String keySuffix = StringUtils.isNotBlank(cacheAbleEntity.keyNameSuffix()) ? cacheAbleEntity.keyNameSuffix() : cacheKeyConfig.getKeyNameSuffix();
                 KeyFormat keyFormat = cacheAbleEntity.keyNameFormat();
                 String cacheKey = BeanUtil.formatKey(result.getClass(), keyFormat);
                 // 添加前缀
@@ -272,7 +273,7 @@ public class CacheComponent {
         Boolean isSuccess = this.setExWithNotExist(getWriteLockKey(primaryKey), primaryKey, result, seconds);
         if (BooleanUtils.isTrue(isSuccess)) {
             // 这里存条件key，值为主键key
-            redisService.set(cacheKeyDTO.getConditionKey(), primaryKey, seconds);
+            redisService.set(cacheKeyDTO.getIndexKey(), primaryKey, seconds);
         }
         return result;
     }
@@ -353,7 +354,7 @@ public class CacheComponent {
     }
 
     public void delete(CacheKeyDTO cacheKeyDTO) {
-        redisService.delete(Lists.newArrayList(cacheKeyDTO.getPrimaryKey(), cacheKeyDTO.getConditionKey()));
+        redisService.delete(Lists.newArrayList(cacheKeyDTO.getPrimaryKey(), cacheKeyDTO.getIndexKey()));
     }
 
     /**

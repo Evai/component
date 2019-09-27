@@ -10,12 +10,11 @@ import java.lang.annotation.*;
 /**
  * @author crh
  * @date 2019-06-17
- * @description 实体类缓存注解
+ * @description 实体类缓存注解，缓存值和索引key，有新增，删除动作
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
-@Inherited
 public @interface CacheAbleEntity {
     /**
      * 缓存id，如果是以"#"开头，则获取当前方法参数值
@@ -53,7 +52,7 @@ public @interface CacheAbleEntity {
     String keyNameSuffix() default "";
 
     /**
-     * 缓存过期随机时间，默认随机300~600秒之间的数，也可以自定义随机时间范围
+     * 缓存过期随机时间，可以自定义随机时间范围
      */
     int[] expired() default {300, 600};
 

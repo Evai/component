@@ -6,14 +6,11 @@ import lombok.Data;
 /**
  * @author crh
  * @date 2019-07-12
- * @description 自定义缓存默认实体类参数
+ * @description 缓存keyName默认全局配置参数
  */
 @Data
-public class CacheKeyBean {
+public class CacheKeyConfig {
     private String keyNamePrefix;
     private String keyNameSuffix;
     private KeyFormat keyNameFormat;
-    private int[] expired;
-    private int asyncSeconds;
-    private int lockSeconds;
 }

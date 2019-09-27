@@ -4,13 +4,11 @@ import com.evai.component.cache.CacheConstant;
 import com.evai.component.cache.enums.KeyFormat;
 import com.evai.component.utils.JacksonUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JavaType;
 import com.google.common.base.CaseFormat;
 import org.aspectj.lang.reflect.MethodSignature;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
+import java.lang.reflect.*;
 import java.util.*;
 
 /**
@@ -41,19 +39,16 @@ public class BeanUtil {
      * String 转 实体类
      *
      * @param str
-     * @param typeReference
+     * @param javaType
      * @param <T>
      * @return
      */
     @SuppressWarnings("unchecked")
-    public static <T> T stringToBean(String str, TypeReference<T> typeReference) {
-        if (str == null || typeReference == null) {
+    public static <T> T stringToBean(String str, JavaType javaType) {
+        if (str == null || javaType == null) {
             return null;
         }
-        if (String.class == typeReference.getType()) {
-            return (T) str;
-        }
-        return JacksonUtil.stringToObj(str, typeReference);
+        return JacksonUtil.stringToObj(str, javaType);
     }
 
     /**
@@ -168,10 +163,17 @@ public class BeanUtil {
      * @param methodSignature
      * @return
      */
-    public static Class getMethodGenericClass(MethodSignature methodSignature) {
-        return (Class) ((ParameterizedType) methodSignature
-                .getMethod()
-                .getGenericReturnType()).getActualTypeArguments()[0];
+    public static Type[] getMethodGenericClass(MethodSignature methodSignature) {
+        return ((ParameterizedType) methodSignature.getMethod()
+                .getGenericReturnType())
+                .getActualTypeArguments();
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <E> E[] toArray(Object[] elementData, Class<E> type) {
+        Object copy = Array.newInstance(type, elementData.length);
+        System.arraycopy(elementData, 0, copy, 0, elementData.length);
+        return (E[]) copy;
     }
 
 }

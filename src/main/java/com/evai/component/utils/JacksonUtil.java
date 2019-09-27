@@ -130,28 +130,29 @@ public class JacksonUtil {
     }
 
     @SuppressWarnings("unchecked")
-    public static <T> T stringToObj(String str, Type type) {
-        if (StringUtils.isBlank(str) || type == null) {
+    public static <T> T stringToObj(String str, JavaType javaType) {
+        if (StringUtils.isBlank(str) || javaType == null) {
             return null;
         }
         try {
-            return (T) (type.equals(String.class) ? str : objectMapper.readValue(str, (JavaType) type));
+            return (T) (javaType.getRawClass().equals(String.class) ? str : objectMapper.readValue(str, javaType));
         } catch (IOException e) {
             log.warn("Parse String to Object error", e);
             return null;
         }
     }
 
-    public static <T> T stringToObj(String str, Class<?> collectionClass, Class<?>... elements) {
-        JavaType javaType = objectMapper
+    /**
+     * 获取泛型的Collection Type
+     *
+     * @param clz
+     * @param genericElements
+     * @return
+     */
+    public static JavaType getJavaType(Class<?> clz, Class<?>... genericElements) {
+        return objectMapper
                 .getTypeFactory()
-                .constructParametricType(collectionClass, elements);
-        try {
-            return objectMapper.readValue(str, javaType);
-        } catch (Exception e) {
-            log.warn("Parse String to Object error", e);
-            return null;
-        }
+                .constructParametricType(clz, genericElements);
     }
 
     public static boolean isJson(String str) {

@@ -17,9 +17,9 @@ public class CacheKeyDTO {
     private String primaryKey;
 
     /**
-     * 条件key，存主键id，关联到主键key的实体类
+     * 索引key，存主键id，关联到主键key的实体类
      */
-    private String conditionKey;
+    private String indexKey;
 
     /**
      * 参数键值对

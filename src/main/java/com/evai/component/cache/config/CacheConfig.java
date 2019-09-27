@@ -1,7 +1,7 @@
 package com.evai.component.cache.config;
 
 import com.evai.component.cache.CacheConstant;
-import com.evai.component.cache.CacheKeyBean;
+import com.evai.component.cache.CacheKeyConfig;
 import com.evai.component.utils.concurrent.ThreadPoolUtil;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,10 +20,10 @@ import java.util.concurrent.TimeUnit;
 public class CacheConfig {
 
     @Bean
-    public CacheKeyBean cacheGenerate() {
-        CacheKeyBean cacheKeyBean = new CacheKeyBean();
-        cacheKeyBean.setKeyNamePrefix(CacheConstant.CACHE_PREFIX);
-        return cacheKeyBean;
+    public CacheKeyConfig cacheGenerate() {
+        CacheKeyConfig cacheKeyConfig = new CacheKeyConfig();
+        cacheKeyConfig.setKeyNamePrefix(CacheConstant.CACHE_PREFIX);
+        return cacheKeyConfig;
     }
 
     @Bean

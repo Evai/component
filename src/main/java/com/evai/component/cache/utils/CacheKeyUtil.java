@@ -2,9 +2,10 @@ package com.evai.component.cache.utils;
 
 
 import com.evai.component.cache.CacheConstant;
-import com.evai.component.cache.CacheKeyBean;
+import com.evai.component.cache.CacheKeyConfig;
 import com.evai.component.cache.CacheKeyDTO;
 import com.evai.component.cache.annotation.CacheAble;
+import com.evai.component.cache.annotation.CacheAbleConfig;
 import com.evai.component.cache.annotation.CacheAbleEntity;
 import com.evai.component.cache.enums.KeyFormat;
 import com.evai.component.cache.exception.IllegalAnnotationException;
@@ -24,6 +25,7 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ReflectionUtils;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.util.List;
@@ -39,7 +41,7 @@ import java.util.Map;
 @AllArgsConstructor
 public class CacheKeyUtil {
 
-    private final CacheKeyBean cacheKeyBean;
+    private final CacheKeyConfig cacheKeyConfig;
 
     /**
      * 生成keyName
@@ -154,23 +156,33 @@ public class CacheKeyUtil {
     }
 
     public String getCacheKeyName(CacheAble cacheAble, ProceedingJoinPoint pjp) {
-        String cacheKey;
+        String cacheKey = null;
         String keyName = cacheAble.keyName();
         if (StringUtils.isNotBlank(keyName)) {
             cacheKey = keyName;
         } else if (!void.class.equals(cacheAble.keyNameClass())) {
             cacheKey = BeanUtil.formatKey(cacheAble.keyNameClass(), cacheAble.keyNameFormat());
         } else {
-            // 都未设置就默认取实现类名称
             Class clazz = pjp.getTarget().getClass();
-            cacheKey = BeanUtil.formatKey(clazz, cacheAble.keyNameFormat());
+            CacheAbleConfig cacheAbleConfig = (CacheAbleConfig) clazz.getDeclaredAnnotation(CacheAbleConfig.class);
+            if (cacheAbleConfig != null) {
+                if (StringUtils.isNotBlank(cacheAbleConfig.keyName())) {
+                    cacheKey = cacheAbleConfig.keyName();
+                } else if (!void.class.equals(cacheAbleConfig.keyNameClass())) {
+                    cacheKey = BeanUtil.formatKey(cacheAbleConfig.keyNameClass(), cacheAbleConfig.keyNameFormat());
+                }
+            }
+            if (cacheKey == null) {
+                // 都未设置就默认取实现类名称
+                cacheKey = BeanUtil.formatKey(clazz, cacheAble.keyNameFormat());
+            }
         }
         return getDefaultCacheKeyName(cacheKey, cacheAble.keyNamePrefix(), cacheAble.keyNameSuffix());
     }
 
     private String getDefaultCacheKeyName(String keyName, String keyPrefix, String keySuffix) {
-        keyPrefix = StringUtils.isNotBlank(keyPrefix) ? keyPrefix : cacheKeyBean.getKeyNamePrefix();
-        keySuffix = StringUtils.isNotBlank(keySuffix) ? keySuffix : cacheKeyBean.getKeyNameSuffix();
+        keyPrefix = StringUtils.isNotBlank(keyPrefix) ? keyPrefix : cacheKeyConfig.getKeyNamePrefix();
+        keySuffix = StringUtils.isNotBlank(keySuffix) ? keySuffix : cacheKeyConfig.getKeyNameSuffix();
         return getCacheKeyName(keyName, keyPrefix, keySuffix);
     }
 
@@ -220,7 +232,7 @@ public class CacheKeyUtil {
 
         // 最终完整的key，cacheName + cacheKeyId
         String finalKey = cacheKey + keyId;
-        cacheKeyDTO.setConditionKey(finalKey);
+        cacheKeyDTO.setIndexKey(finalKey);
         log.debug("finalKey:【{}】", finalKey);
         return cacheKeyDTO;
     }
@@ -381,7 +393,7 @@ public class CacheKeyUtil {
 
     public Class getGenericType(Object obj, int index) {
         try {
-            return  (Class) ((ParameterizedType) obj
+            return (Class) ((ParameterizedType) obj
                     .getClass()
                     .getGenericSuperclass())
                     .getActualTypeArguments()[index];
