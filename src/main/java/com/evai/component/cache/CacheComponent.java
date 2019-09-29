@@ -234,7 +234,7 @@ public class CacheComponent {
                 }
             });
         } catch (GetLockFailedException e) {
-            log.info("getReadLock key: [{}] failed", key);
+            log.warn("getReadLock key: [{}] failed", key);
         }
     }
 

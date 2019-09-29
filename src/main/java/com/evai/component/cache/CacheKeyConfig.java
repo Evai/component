@@ -12,5 +12,4 @@ import lombok.Data;
 public class CacheKeyConfig {
     private String keyNamePrefix;
     private String keyNameSuffix;
-    private KeyFormat keyNameFormat;
 }

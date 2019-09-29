@@ -40,7 +40,14 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
     @Autowired
     protected M baseMapper;
 
-    private static final String SPLIT = "_split_";
+    /**
+     * 分表分割符号
+     *
+     * @return String
+     */
+    protected String getSplit() {
+        return "_split_";
+    }
 
     /**
      * 缓存所有主表对应的分表列表
@@ -209,7 +216,7 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
     private boolean createAndInsertBatch(List<T> entityList, int retainCount, String routeTableName, BiFunction<String, List<T>, Boolean> fn) {
         if (retainCount <= 0) {
             // 如果当前表容量不足，新建表
-            routeTableName = getBaseTableName() + SPLIT + entityList.get(0).getId();
+            routeTableName = getBaseTableName() + getSplit() + entityList.get(0).getId();
             if (!isExistForTable(routeTableName)) {
                 createTable(routeTableName);
             }
@@ -221,7 +228,7 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
             // 插入旧表
             fn.apply(routeTableName, firstList);
             long id = entityList.get(retainCount).getId();
-            routeTableName = getBaseTableName() + SPLIT + id;
+            routeTableName = getBaseTableName() + getSplit() + id;
             if (!isExistForTable(routeTableName)) {
                 createTable(routeTableName);
             }
@@ -260,7 +267,7 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
         List<String> tableList;
         if (softReference == null || (tableList = softReference.get()) == null) {
             tableList = Lists.newArrayList(getBaseTableName());
-            tableList.addAll(baseMapper.getTableList(getDatabase(), getBaseTableName() + SPLIT + "%"));
+            tableList.addAll(baseMapper.getTableList(getDatabase(), getBaseTableName() + getSplit() + "%"));
             SOFT_REFERENCE_MAP.put(getBaseTableName(), new SoftReference<>(tableList));
         }
         return tableList;
@@ -423,7 +430,7 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
         }
         List<String> tableList = getTableList();
         Page<?> page = new Page<>(1, sqlCondition.getPageSize());
-        // 如果不是主表，直接从该表后面的所以表查询
+        // 如果不是主表，直接从该表后面的所有表查询
         if (!tableName.equals(getBaseTableName())) {
             for (int i = 0; i < tableList.size(); i++) {
                 if (tableList.get(i).equals(tableName)) {
@@ -543,7 +550,7 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
     private Long getTableNameSuffixId(String tableName) {
         long tableNameSuffixId = 0L;
         try {
-            tableNameSuffixId = Long.valueOf(tableName.substring(tableName.lastIndexOf(SPLIT) + SPLIT.length()));
+            tableNameSuffixId = Long.valueOf(tableName.substring(tableName.lastIndexOf(getSplit()) + getSplit().length()));
         } catch (NumberFormatException e) {
             // main table
         }
@@ -602,7 +609,7 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
     }
 
     private String assembleTableName(List<Long> tableIdList, int index) {
-        return getBaseTableName() + SPLIT + tableIdList.get(index);
+        return getBaseTableName() + getSplit() + tableIdList.get(index);
     }
 
 }

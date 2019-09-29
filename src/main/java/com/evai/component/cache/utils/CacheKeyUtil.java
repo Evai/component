@@ -156,6 +156,8 @@ public class CacheKeyUtil {
     }
 
     public String getCacheKeyName(CacheAble cacheAble, ProceedingJoinPoint pjp) {
+        Class clazz = pjp.getTarget().getClass();
+        CacheAbleConfig cacheAbleConfig = (CacheAbleConfig) clazz.getDeclaredAnnotation(CacheAbleConfig.class);
         String cacheKey = null;
         String keyName = cacheAble.keyName();
         if (StringUtils.isNotBlank(keyName)) {
@@ -163,8 +165,6 @@ public class CacheKeyUtil {
         } else if (!void.class.equals(cacheAble.keyNameClass())) {
             cacheKey = BeanUtil.formatKey(cacheAble.keyNameClass(), cacheAble.keyNameFormat());
         } else {
-            Class clazz = pjp.getTarget().getClass();
-            CacheAbleConfig cacheAbleConfig = (CacheAbleConfig) clazz.getDeclaredAnnotation(CacheAbleConfig.class);
             if (cacheAbleConfig != null) {
                 if (StringUtils.isNotBlank(cacheAbleConfig.keyName())) {
                     cacheKey = cacheAbleConfig.keyName();
@@ -177,7 +177,15 @@ public class CacheKeyUtil {
                 cacheKey = BeanUtil.formatKey(clazz, cacheAble.keyNameFormat());
             }
         }
-        return getDefaultCacheKeyName(cacheKey, cacheAble.keyNamePrefix(), cacheAble.keyNameSuffix());
+
+        String keyNamePrefix = cacheAble.keyNamePrefix();
+        String keyNameSuffix = cacheAble.keyNameSuffix();
+        if (cacheAbleConfig != null) {
+            keyNamePrefix = StringUtils.isNotBlank(keyNamePrefix) ? keyNamePrefix : cacheAbleConfig.keyNamePrefix();
+            keyNameSuffix = StringUtils.isNotBlank(keyNameSuffix) ? keyNameSuffix : cacheAbleConfig.keyNameSuffix();
+        }
+
+        return getDefaultCacheKeyName(cacheKey, keyNamePrefix, keyNameSuffix);
     }
 
     private String getDefaultCacheKeyName(String keyName, String keyPrefix, String keySuffix) {
