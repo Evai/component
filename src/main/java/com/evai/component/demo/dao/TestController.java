@@ -1,16 +1,14 @@
-package com.evai.component;
+package com.evai.component.demo.dao;
 
 import com.evai.component.cache.annotation.CacheAble;
 import com.evai.component.cache.annotation.CacheAbleConfig;
 import com.evai.component.cache.annotation.CacheAbleEntity;
 import com.evai.component.cache.enums.CacheAction;
-import com.evai.component.entity.User;
-import com.evai.component.service.UserService;
+import com.evai.component.demo.entity.User;
+import com.evai.component.demo.service.UserService;
 import com.evai.component.utils.SleepUtil;
 import com.google.common.collect.Maps;
 import lombok.AllArgsConstructor;
-import org.springframework.cache.annotation.CacheConfig;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 

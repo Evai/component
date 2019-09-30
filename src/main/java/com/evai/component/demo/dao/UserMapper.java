@@ -1,6 +1,6 @@
-package com.evai.component.dao;
+package com.evai.component.demo.dao;
 
-import com.evai.component.entity.User;
+import com.evai.component.demo.entity.User;
 import com.evai.component.mybatis.split.SplitTableMapper;
 import org.apache.ibatis.annotations.Mapper;
 

@@ -1,10 +1,10 @@
-package com.evai.component.service;
+package com.evai.component.demo.service;
 
 import com.evai.component.cache.annotation.CacheAbleEntity;
 import com.evai.component.cache.enums.CacheAction;
-import com.evai.component.entity.User;
+import com.evai.component.demo.entity.User;
 import com.evai.component.cache.annotation.CacheAble;
-import com.evai.component.dao.UserMapper;
+import com.evai.component.demo.dao.UserMapper;
 import com.evai.component.mybatis.split.BaseSplitTableServiceImpl;
 import com.evai.component.mybatis.split.SqlCondition;
 import com.evai.component.utils.SleepUtil;

@@ -1,4 +1,4 @@
-package com.evai.component.entity;
+package com.evai.component.demo.entity;
 
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.evai.component.mybatis.BaseEntity;

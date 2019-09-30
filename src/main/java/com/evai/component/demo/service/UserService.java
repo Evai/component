@@ -1,6 +1,6 @@
-package com.evai.component.service;
+package com.evai.component.demo.service;
 
-import com.evai.component.entity.User;
+import com.evai.component.demo.entity.User;
 import com.evai.component.mybatis.split.BaseSplitTableService;
 
 import java.util.List;
