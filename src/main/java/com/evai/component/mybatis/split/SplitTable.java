@@ -29,8 +29,8 @@ public @interface SplitTable {
     String primaryKey() default "id";
 
     /**
-     * 单表最大容量（总条数）
+     * 单表最大容量（默认500万条记录）
      */
-    int tableMaxCapacity() default 5000000;
+    int tableMaxCapacity() default 0x4C4B40;
 
 }

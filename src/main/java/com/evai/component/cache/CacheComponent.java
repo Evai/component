@@ -166,7 +166,7 @@ public class CacheComponent {
         if (!BaseEntity.class.equals(clazz.getSuperclass()) && clazz.getDeclaredAnnotation(TableName.class) == null) {
             throw new IllegalParamException("无效的查询方法返回类型，请指定具体实体类");
         }
-        // 通过条件key查询到主键key
+        // 通过索引key查询到主键key
         String primaryKey = redisService.get(cacheKeyDTO.getIndexKey());
         // 不存在或已失效
         if (primaryKey == null) {
@@ -185,8 +185,8 @@ public class CacheComponent {
             }
             // 如果到期时间 < 设置的到期时间，更新缓存数据，防止缓存穿透
             Long primaryKeyExpired = redisService.getExpire(primaryKey, TimeUnit.SECONDS);
-            Long conditionKeyExpired = redisService.getExpire(cacheKeyDTO.getIndexKey(), TimeUnit.SECONDS);
-            if (conditionKeyExpired == null || conditionKeyExpired < asyncSeconds) {
+            Long indexKeyExpired = redisService.getExpire(cacheKeyDTO.getIndexKey(), TimeUnit.SECONDS);
+            if (indexKeyExpired == null || indexKeyExpired < asyncSeconds) {
                 redisService.expire(cacheKeyDTO.getIndexKey(), seconds, TimeUnit.SECONDS);
             }
             if (primaryKeyExpired == null || primaryKeyExpired < asyncSeconds) {
@@ -202,7 +202,7 @@ public class CacheComponent {
 
             T entity = BeanUtil.stringToBean(entityJson, clazz);
             if (entity != null) {
-                // 如果查询结果实体类中字段值和当前查询字段值不一样，说明已经更改过，重新进行条件查询
+                // 如果查询结果实体类中字段值和当前查询字段值不一样，说明已经更改过，重新进行索引查询
                 List<Field> fieldList = BeanUtil.getAllFields(entity.getClass());
                 for (Field field : fieldList) {
                     Object val = cacheKeyDTO.getParamMap().get(field.getName());
@@ -241,7 +241,7 @@ public class CacheComponent {
     private <T> T getEntityResult(CacheKeyDTO cacheKeyDTO, int seconds, CacheAbleEntity cacheAbleEntity, Supplier<T> supplier) {
         T result = supplier.get();
         String primaryKey = null;
-        // 这里存条件key，值为主键key
+        // 这里存索引key，值为主键key
         if (result == null) {
             setNullValue(cacheKeyDTO.getIndexKey());
             return null;
@@ -272,7 +272,7 @@ public class CacheComponent {
         // 判断写锁是否存在，存在则不放入缓存，这里存的是实体类
         Boolean isSuccess = this.setExWithNotExist(getWriteLockKey(primaryKey), primaryKey, result, seconds);
         if (BooleanUtils.isTrue(isSuccess)) {
-            // 这里存条件key，值为主键key
+            // 这里存索引key，值为主键key
             redisService.set(cacheKeyDTO.getIndexKey(), primaryKey, seconds);
         }
         return result;
@@ -294,7 +294,7 @@ public class CacheComponent {
      * @param <T>
      * @return
      */
-    public <T> T writeData(CacheKeyDTO cacheKeyDTO, long lockSeconds, Supplier<T> supplier) {
+    <T> T writeData(CacheKeyDTO cacheKeyDTO, long lockSeconds, Supplier<T> supplier) {
         if (cacheKeyDTO.getPrimaryKey() == null) {
             return supplier.get();
         }
@@ -313,7 +313,7 @@ public class CacheComponent {
         }
     }
 
-    public <T> T insertAutoData(ProceedingJoinPoint pjp, CacheAbleEntity cacheAbleEntity, MethodSignature methodSignature, long lockSeconds, Supplier<T> supplier) throws IllegalAccessException {
+    <T> T insertAutoData(ProceedingJoinPoint pjp, CacheAbleEntity cacheAbleEntity, MethodSignature methodSignature, long lockSeconds, Supplier<T> supplier) throws IllegalAccessException {
         // 先执行插入逻辑后取到自增id
         T result = supplier.get();
         CacheKeyDTO cacheKeyDTO = cacheKeyUtil.assembleFinalCacheKey(pjp, cacheAbleEntity, methodSignature);
@@ -353,7 +353,7 @@ public class CacheComponent {
         return CacheConstant.WRITE_LOCK + key;
     }
 
-    public void delete(CacheKeyDTO cacheKeyDTO) {
+    private void delete(CacheKeyDTO cacheKeyDTO) {
         redisService.delete(Lists.newArrayList(cacheKeyDTO.getPrimaryKey(), cacheKeyDTO.getIndexKey()));
     }
 
