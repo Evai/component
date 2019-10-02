@@ -1,34 +1,14 @@
 package com.evai.component.cache;
 
-import com.baomidou.mybatisplus.annotation.TableName;
-import com.evai.component.cache.annotation.CacheAbleEntity;
-import com.evai.component.cache.enums.KeyFormat;
-import com.evai.component.cache.exception.GetLockFailedException;
-import com.evai.component.cache.exception.IllegalParamException;
-import com.evai.component.cache.lock.RedisLock;
-import com.evai.component.cache.utils.CacheKeyUtil;
-import com.evai.component.mybatis.BaseEntity;
-import com.evai.component.mybatis.PrimaryKey;
-import com.evai.component.mybatis.utils.ReflectUtil;
 import com.evai.component.utils.BeanUtil;
-import com.evai.component.utils.concurrent.ThreadPoolUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.google.common.collect.Lists;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.BooleanUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.aspectj.lang.ProceedingJoinPoint;
-import org.aspectj.lang.reflect.MethodSignature;
-import org.springframework.data.redis.connection.ReturnType;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.io.Serializable;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.function.Supplier;
 
 /**
  * @author crh

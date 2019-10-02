@@ -5,12 +5,11 @@ import com.evai.component.cache.annotation.CacheAbleEntity;
 import com.evai.component.cache.enums.KeyFormat;
 import com.evai.component.cache.exception.GetLockFailedException;
 import com.evai.component.cache.exception.IllegalParamException;
-import com.evai.component.cache.lock.RedisLock;
+import com.evai.component.cache.lock.CacheLock;
 import com.evai.component.cache.utils.CacheKeyUtil;
 import com.evai.component.mybatis.BaseEntity;
 import com.evai.component.mybatis.utils.ReflectUtil;
 import com.evai.component.utils.BeanUtil;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JavaType;
 import com.google.common.collect.Lists;
 import lombok.AllArgsConstructor;
@@ -47,7 +46,7 @@ public class CacheComponent {
     private final CacheKeyConfig cacheKeyConfig;
     private final RedisTemplate<String, String> redisTemplate;
     private final CacheKeyUtil cacheKeyUtil;
-    private final RedisLock redisLock;
+    private final CacheLock cacheLock;
     /**
      * 异步更新缓存线程池
      */
@@ -224,7 +223,7 @@ public class CacheComponent {
         // 先查询是否已经有该key的读锁，如果有直接返回，避免不必要的查询给数据库造成压力
         final String readKey = getReadLockKey(key);
         try {
-            redisLock.tryLock(readKey, CacheConstant.SECOND_OF_10, () -> {
+            cacheLock.tryLock(readKey, CacheConstant.SECOND_OF_10, () -> {
                 try {
                     // 异步更新值
                     cacheExecutor.execute(runnable);
