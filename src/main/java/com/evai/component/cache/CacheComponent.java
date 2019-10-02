@@ -28,6 +28,7 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -226,7 +227,13 @@ public class CacheComponent {
             cacheLock.tryLock(readKey, CacheConstant.SECOND_OF_10, () -> {
                 try {
                     // 异步更新值
-                    cacheExecutor.execute(runnable);
+                    cacheExecutor.execute(() -> {
+                        try {
+                            runnable.run();
+                        } catch (Exception e) {
+                            log.error("asyncUpdateCache error", e);
+                        }
+                    });
                 } catch (RejectedExecutionException e) {
                     // 当队列任务无法继续执行时，直接让主线程更新缓存
                     runnable.run();
@@ -382,6 +389,5 @@ public class CacheComponent {
         String key = cacheKeyUtil.assembleKey(keyNamePrefix, keyNameSuffix, keyNameClass, keyFormat, keyObj);
         return redisService.delete(key);
     }
-
 
 }
