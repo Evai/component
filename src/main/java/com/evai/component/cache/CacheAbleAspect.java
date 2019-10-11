@@ -43,7 +43,7 @@ public class CacheAbleAspect {
     private final CacheKeyUtil cacheKeyUtil;
 
     @Around(value = "@annotation(cacheAble)")
-    public <T> Object around(ProceedingJoinPoint pjp, CacheAble cacheAble) throws Throwable {
+    public Object around(ProceedingJoinPoint pjp, CacheAble cacheAble) throws Throwable {
         int asyncSeconds = cacheAble.asyncSeconds();
         int[] expired = cacheAble.expired();
 
@@ -73,10 +73,9 @@ public class CacheAbleAspect {
      * @param pjp
      * @return
      */
-    @SuppressWarnings("unchecked")
-    private <T> T proceed(ProceedingJoinPoint pjp) {
+    private Object proceed(ProceedingJoinPoint pjp) {
         try {
-            return (T) pjp.proceed();
+            return pjp.proceed();
         } catch (Throwable throwable) {
             CommonUtil.doThrow(throwable);
             return null;
