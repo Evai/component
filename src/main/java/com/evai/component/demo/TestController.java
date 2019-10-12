@@ -1,11 +1,13 @@
-package com.evai.component.demo.dao;
+package com.evai.component.demo;
 
+import com.evai.component.cache.RedisService;
 import com.evai.component.cache.annotation.CacheAble;
 import com.evai.component.cache.annotation.CacheAbleConfig;
 import com.evai.component.cache.annotation.CacheAbleEntity;
 import com.evai.component.cache.enums.CacheAction;
 import com.evai.component.demo.entity.User;
 import com.evai.component.demo.service.UserService;
+import com.evai.component.utils.RandomUtil;
 import com.evai.component.utils.SleepUtil;
 import com.google.common.collect.Maps;
 import lombok.AllArgsConstructor;
@@ -14,6 +16,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * @author crh
@@ -27,11 +31,16 @@ import java.util.Map;
 public class TestController {
 
     private final UserService userService;
+    private final RedisService redisService;
 
     @RequestMapping("/cache/id")
     @CacheAble(keyId = "#id")
     public User cache(Long id) {
-        SleepUtil.seconds(1);
+        redisService.multi(() -> {
+            redisService.set("bbbbb", "wqewqe", 300);
+            redisService.set("bbbbb:", "wqeqw", 300);
+        });
+//        SleepUtil.seconds(1);
         return userService.getOneById(id);
     }
 
@@ -65,6 +74,5 @@ public class TestController {
         map.put(id, userService.getOneById(id));
         return map;
     }
-
 
 }

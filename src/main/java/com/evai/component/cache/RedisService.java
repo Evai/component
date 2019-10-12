@@ -3,8 +3,11 @@ package com.evai.component.cache;
 import com.evai.component.utils.BeanUtil;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.SessionCallback;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -85,4 +88,19 @@ public class RedisService {
         return redisTemplate.opsForList().leftPop(key, timeout, unit);
     }
 
+    /**
+     * 事务
+     * @param runnable
+     */
+    public void multi(Runnable runnable) {
+        SessionCallback sessionCallback = new SessionCallback() {
+            @Override
+            public Object execute(RedisOperations redisOperations) throws DataAccessException {
+                redisOperations.multi();
+                runnable.run();
+                return redisOperations.exec();
+            }
+        };
+        redisTemplate.execute(sessionCallback);
+    }
 }
