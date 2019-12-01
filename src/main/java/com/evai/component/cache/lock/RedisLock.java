@@ -18,14 +18,13 @@ import java.util.function.Supplier;
  * @date 2019/6/19
  * @description 分布式锁
  */
-@Service
 @Slf4j
 @AllArgsConstructor
 public class RedisLock implements CacheLock {
 
     private final RedissonClient redissonClient;
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
 
     @Override
     public <R> R tryLock(String key, long waitTime, long expired, Supplier<R> supplier) throws GetLockFailedException {

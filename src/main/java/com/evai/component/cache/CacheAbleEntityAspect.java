@@ -1,6 +1,5 @@
 package com.evai.component.cache;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.evai.component.cache.annotation.CacheAbleEntity;
 import com.evai.component.cache.enums.CacheAction;
 import com.evai.component.cache.utils.CacheKeyUtil;
@@ -12,6 +11,7 @@ import org.aspectj.lang.Signature;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -23,14 +23,12 @@ import java.util.Set;
  * @description 缓存切面
  */
 @Aspect
-@Component
 @Slf4j
 @Order(51)
 @AllArgsConstructor
 public class CacheAbleEntityAspect {
 
     private final CacheComponent cacheComponent;
-    private final RedisService redisService;
     private final CacheKeyUtil cacheKeyUtil;
 
     @Around(value = "@annotation(cacheAbleEntity)")
@@ -51,8 +49,7 @@ public class CacheAbleEntityAspect {
             case DEL_PATTERN:
                 Object result = pjp.proceed();
                 String key = cacheKeyUtil.getCacheKeyName(cacheAbleEntity, pjp);
-                Set<String> keys = redisService.keys(key + "*");
-                redisService.delete(keys);
+                cacheComponent.delPattern(key);
                 return result;
             case SELECT:
             default:

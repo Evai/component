@@ -1,8 +1,8 @@
 package com.evai.component.cache.utils;
 
 
+import com.evai.component.cache.CacheProperties;
 import com.evai.component.cache.CacheConstant;
-import com.evai.component.cache.CacheKeyConfig;
 import com.evai.component.cache.CacheKeyDTO;
 import com.evai.component.cache.annotation.CacheAble;
 import com.evai.component.cache.annotation.CacheAbleConfig;
@@ -25,7 +25,6 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ReflectionUtils;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.util.List;
@@ -37,11 +36,10 @@ import java.util.Map;
  * description
  */
 @Slf4j
-@Component
 @AllArgsConstructor
 public class CacheKeyUtil {
 
-    private final CacheKeyConfig cacheKeyConfig;
+    private final CacheProperties cacheProperties;
 
     /**
      * 生成keyName
@@ -189,8 +187,8 @@ public class CacheKeyUtil {
     }
 
     private String getDefaultCacheKeyName(String keyName, String keyPrefix, String keySuffix) {
-        keyPrefix = StringUtils.isNotBlank(keyPrefix) ? keyPrefix : cacheKeyConfig.getKeyNamePrefix();
-        keySuffix = StringUtils.isNotBlank(keySuffix) ? keySuffix : cacheKeyConfig.getKeyNameSuffix();
+        keyPrefix = StringUtils.isNotBlank(keyPrefix) ? keyPrefix : cacheProperties.getKeyNamePrefix();
+        keySuffix = StringUtils.isNotBlank(keySuffix) ? keySuffix : cacheProperties.getKeyNameSuffix();
         return getCacheKeyName(keyName, keyPrefix, keySuffix);
     }
 

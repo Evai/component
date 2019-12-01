@@ -18,6 +18,7 @@ import org.aspectj.lang.Signature;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
@@ -33,7 +34,6 @@ import java.util.Set;
  * @description 通用缓存切面
  */
 @Aspect
-@Component
 @Slf4j
 @Order(50)
 @AllArgsConstructor

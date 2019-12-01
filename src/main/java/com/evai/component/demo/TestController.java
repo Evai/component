@@ -1,13 +1,13 @@
 package com.evai.component.demo;
 
 import com.evai.component.cache.RedisService;
+import com.evai.component.cache.RedisServiceImpl;
 import com.evai.component.cache.annotation.CacheAble;
 import com.evai.component.cache.annotation.CacheAbleConfig;
 import com.evai.component.cache.annotation.CacheAbleEntity;
 import com.evai.component.cache.enums.CacheAction;
 import com.evai.component.demo.entity.User;
 import com.evai.component.demo.service.UserService;
-import com.evai.component.utils.RandomUtil;
 import com.evai.component.utils.SleepUtil;
 import com.google.common.collect.Maps;
 import lombok.AllArgsConstructor;
@@ -16,8 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * @author crh
@@ -74,5 +72,4 @@ public class TestController {
         map.put(id, userService.getOneById(id));
         return map;
     }
-
 }

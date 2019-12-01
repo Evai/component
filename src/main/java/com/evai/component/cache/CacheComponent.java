@@ -22,13 +22,14 @@ import org.springframework.data.redis.connection.ReturnType;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -39,12 +40,11 @@ import java.util.function.Supplier;
  * @description
  */
 @Slf4j
-@Component
 @AllArgsConstructor
 public class CacheComponent {
 
     private final RedisService redisService;
-    private final CacheKeyConfig cacheKeyConfig;
+    private final CacheProperties cacheProperties;
     private final RedisTemplate<String, String> redisTemplate;
     private final CacheKeyUtil cacheKeyUtil;
     private final CacheLock cacheLock;
@@ -256,8 +256,8 @@ public class CacheComponent {
         } else {
             Serializable id = ReflectUtil.getPrimaryValue(result);
             if (id != null) {
-                String keyPrefix = StringUtils.isNotBlank(cacheAbleEntity.keyNamePrefix()) ? cacheAbleEntity.keyNamePrefix() : cacheKeyConfig.getKeyNamePrefix();
-                String keySuffix = StringUtils.isNotBlank(cacheAbleEntity.keyNameSuffix()) ? cacheAbleEntity.keyNameSuffix() : cacheKeyConfig.getKeyNameSuffix();
+                String keyPrefix = StringUtils.isNotBlank(cacheAbleEntity.keyNamePrefix()) ? cacheAbleEntity.keyNamePrefix() : cacheProperties.getKeyNamePrefix();
+                String keySuffix = StringUtils.isNotBlank(cacheAbleEntity.keyNameSuffix()) ? cacheAbleEntity.keyNameSuffix() : cacheProperties.getKeyNameSuffix();
                 KeyFormat keyFormat = cacheAbleEntity.keyNameFormat();
                 String cacheKey = BeanUtil.formatKey(result.getClass(), keyFormat);
                 // 添加前缀
@@ -360,7 +360,19 @@ public class CacheComponent {
     }
 
     private void delete(CacheKeyDTO cacheKeyDTO) {
-        redisService.delete(Lists.newArrayList(cacheKeyDTO.getPrimaryKey(), cacheKeyDTO.getIndexKey()));
+        redisService.unlink(Lists.newArrayList(cacheKeyDTO.getPrimaryKey(), cacheKeyDTO.getIndexKey()));
+    }
+
+    public void delPattern(String key) {
+        long cursorId = 0L;
+        for (;;) {
+            ScanCursor<String> scanCursor = redisService.scan(cursorId, "*" + key + "*");
+            if (scanCursor.getCursorId() == 0L || CollectionUtils.isEmpty(scanCursor.getItems())) {
+                break;
+            }
+            redisService.unlink(scanCursor.getItems());
+            cursorId = scanCursor.getCursorId();
+        }
     }
 
     /**
@@ -374,7 +386,7 @@ public class CacheComponent {
     public Long deleteByKeyNamePattern(String keyNamePrefix, String keyNameSuffix, Class keyNameClass, KeyFormat keyFormat) {
         String keyName = cacheKeyUtil.generateKeyName(keyNamePrefix, keyNameSuffix, keyNameClass, keyFormat);
         Set<String> keys = redisService.keys(keyName + "*");
-        return redisService.delete(keys);
+        return redisService.unlink(keys);
     }
 
     /**
@@ -385,9 +397,9 @@ public class CacheComponent {
      * @param keyNameClass
      * @param keyFormat
      */
-    public Boolean deleteByKey(String keyNamePrefix, String keyNameSuffix, Class keyNameClass, KeyFormat keyFormat, Object keyObj) {
+    public Long deleteByKey(String keyNamePrefix, String keyNameSuffix, Class keyNameClass, KeyFormat keyFormat, Object keyObj) {
         String key = cacheKeyUtil.assembleKey(keyNamePrefix, keyNameSuffix, keyNameClass, keyFormat, keyObj);
-        return redisService.delete(key);
+        return redisService.unlink(Collections.singleton(key));
     }
 
 }

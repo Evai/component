@@ -1,106 +1,67 @@
 package com.evai.component.cache;
 
 import com.evai.component.utils.BeanUtil;
-import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisOperations;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.SessionCallback;
-import org.springframework.stereotype.Component;
 
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.Collection;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author crh
- * @date 2019-06-11
  * @description
+ * @date 2019-12-01
  */
-@Component
-@Slf4j
-@AllArgsConstructor
-public class RedisService {
+public interface RedisService {
 
-    private final RedisTemplate<String, String> redisTemplate;
+    String get(String key);
 
+    void set(String key, String value, long seconds);
 
-    public String get(String key) {
-        return redisTemplate.opsForValue().get(key);
-    }
+    <T> T get(String key, Class<T> clazz);
 
-    public void set(String key, String value, long seconds) {
-        redisTemplate.opsForValue().set(key, value, seconds, TimeUnit.SECONDS);
-    }
+    Long getExpire(String key, TimeUnit timeUnit);
 
-    public <T> T get(String key, Class<T> clazz) {
-        return BeanUtil.stringToBean(this.get(key), clazz);
-    }
+    boolean expire(String key, long timeout, TimeUnit timeUnit);
 
-    public Long getExpire(String key, TimeUnit timeUnit) {
-        return redisTemplate.getExpire(key, timeUnit);
-    }
-
-    public boolean expire(String key, long timeout, TimeUnit timeUnit) {
-        return Boolean.TRUE.equals(redisTemplate.expire(key, timeout, timeUnit));
-    }
-
-    public boolean delete(String key) {
-        return Boolean.TRUE.equals(redisTemplate.delete(key));
-    }
+    boolean delete(String key);
 
     /**
      * 获取keys，指定 pattern
      *
      * @param pattern "keyName*"
      */
-    public Set<String> keys(String pattern) {
-        return redisTemplate.keys(pattern);
-    }
+    @Deprecated
+    Set<String> keys(String pattern);
+
+    ScanCursor<String> scan(Long cursorId, String pattern);
 
     /**
      * 批量删除key，指定 key 集合
      *
      * @param keys
      */
-    public Long delete(Collection<String> keys) {
-        return redisTemplate.delete(keys);
-    }
+    Long delete(Collection<String> keys);
 
-    public boolean exists(String key) {
-        return Boolean.TRUE.equals(redisTemplate.execute((RedisCallback<Boolean>) redisConnection -> redisConnection.exists(key.getBytes())));
-    }
+    Long unlink(Collection<String> keys);
 
-    public Long size(String key) {
-        return redisTemplate.opsForList().size(key);
-    }
+    boolean exists(String key);
 
-    public Long rightPushAll(String key, String... values) {
-        return redisTemplate.opsForList().rightPushAll(key, values);
-    }
+    Long size(String key);
 
-    public String leftPop(String key) {
-        return redisTemplate.opsForList().leftPop(key);
-    }
+    Long rightPushAll(String key, String... values);
 
-    public String leftPop(String key, long timeout, TimeUnit unit) {
-        return redisTemplate.opsForList().leftPop(key, timeout, unit);
-    }
+    String leftPop(String key);
+
+    String leftPop(String key, long timeout, TimeUnit unit);
 
     /**
-     * 事务
+     * 批处理
+     *
      * @param runnable
      */
-    public void multi(Runnable runnable) {
-        SessionCallback sessionCallback = new SessionCallback() {
-            @Override
-            public Object execute(RedisOperations redisOperations) throws DataAccessException {
-                redisOperations.multi();
-                runnable.run();
-                return redisOperations.exec();
-            }
-        };
-        redisTemplate.execute(sessionCallback);
-    }
+    void multi(Runnable runnable);
 }
