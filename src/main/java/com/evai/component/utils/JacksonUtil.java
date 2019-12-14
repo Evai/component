@@ -178,8 +178,7 @@ public class JacksonUtil {
         if (arr == null) {
             return Collections.emptyList();
         }
-        Lists.newArrayList(arr);
-        return new ArrayList<>(Arrays.asList(arr));
+        return Lists.newArrayList(arr);
     }
 
     public static void main(String[] args) {

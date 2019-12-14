@@ -22,6 +22,9 @@ public interface SplitTableMapper<T> {
     @UpdateProvider(type = SQLProvider.class, method = "customSQL")
     void updateSQL(@Param("sql") String sql);
 
+    @Select("explain select count(*) from ${tableName}")
+    Map<String, Object> explainTable(@Param("tableName") String tableName);
+
     /**
      * 新增一条记录到指定的表
      *

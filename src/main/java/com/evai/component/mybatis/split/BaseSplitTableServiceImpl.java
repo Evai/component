@@ -2,24 +2,34 @@ package com.evai.component.mybatis.split;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.evai.component.cache.CacheConstant;
+import com.evai.component.cache.RedisService;
+import com.evai.component.cache.lock.CacheLock;
+import com.evai.component.cache.lock.RedisLock;
 import com.evai.component.mybatis.BaseEntity;
 import com.evai.component.mybatis.MybatisBatchExecutor;
 import com.evai.component.mybatis.TransactionService;
 import com.evai.component.utils.BeanUtil;
+import com.evai.component.utils.JacksonUtil;
+import com.evai.component.utils.SleepUtil;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.annotations.Param;
+import org.redisson.api.RLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.CollectionUtils;
 
+import javax.annotation.Resource;
 import java.io.Serializable;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
+import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -37,8 +47,14 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
     protected MybatisBatchExecutor mybatisBatchExecutor;
     @Autowired
     protected TransactionService transactionService;
-    @Autowired
+    @Resource
     protected M baseMapper;
+    @Resource
+    protected CacheLock redisLock;
+    @Autowired
+    protected RedisService redisService;
+
+    private final static long TABLE_LIST_EXPIRED = CacheConstant.SECOND_OF_AN_HOUR * 24;
 
     /**
      * 分表分割符号
@@ -48,11 +64,6 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
     protected String getSplit() {
         return "_split_";
     }
-
-    /**
-     * 缓存所有主表对应的分表列表
-     */
-    private final static Map<String, SoftReference<List<String>>> SOFT_REFERENCE_MAP = new ConcurrentHashMap<>();
 
     /**
      * 数据库名称
@@ -93,6 +104,9 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
 
     @Override
     public boolean insert(T entity) {
+        if (entity == null) {
+            return false;
+        }
         return insertBatch(Collections.singletonList(entity));
     }
 
@@ -106,11 +120,8 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
         if (CollectionUtils.isEmpty(entityList)) {
             return false;
         }
-        for (T entity : entityList) {
-            entity.setId(IdWorker.getId());
-        }
         BiFunction<String, List<T>, Boolean> fn = (table, list) -> {
-            transactionService.executeRequired(() -> mybatisBatchExecutor.batch(getMapperClass(), list, batchSize, (m, e) -> m.insert(table, e)));
+            mybatisBatchExecutor.batch(getMapperClass(), list, batchSize, (m, e) -> m.insert(table, e));
             return true;
         };
         return checkAndCreateTable(entityList, fn);
@@ -204,39 +215,76 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
     }
 
     private boolean checkAndCreateTable(List<T> entityList, BiFunction<String, List<T>, Boolean> fn) {
-        long id = entityList.get(0).getId();
-        List<Long> tableIdList = getTableIdList();
-        String routeTableName = routeTableNameById(tableIdList, id);
-        int count = countForTable(routeTableName);
+        List<String> tableList = getTableList();
+        String lastTableName = tableList.get(tableList.size() - 1);
+        // 获取最后一张表容量
+        int count = countForTable(lastTableName);
         // 当前表剩余容量
         int retainCount = getMaxTableCount() - count;
-        return createAndInsertBatch(entityList, retainCount, routeTableName, fn);
+        return createAndInsertBatch(entityList, retainCount, lastTableName, fn);
     }
 
     private boolean createAndInsertBatch(List<T> entityList, int retainCount, String routeTableName, BiFunction<String, List<T>, Boolean> fn) {
-        if (retainCount <= 0) {
-            // 如果当前表容量不足，新建表
-            routeTableName = getBaseTableName() + getSplit() + entityList.get(0).getId();
-            if (!isExistForTable(routeTableName)) {
-                createTable(routeTableName);
-            }
-            return createAndInsertBatch(entityList, getMaxTableCount(), routeTableName, fn);
+        if (entityList.size() > getMaxTableCount()) {
+            throw new RuntimeException("批量添加的数据已超过表最大容量");
         }
-        // 如果当前列表数量大于表的剩余容量，先把列表前部分数据插入到旧表，再创建新表插入余下的数据
-        if (entityList.size() > retainCount) {
-            List<T> firstList = entityList.subList(0, retainCount);
-            // 插入旧表
-            fn.apply(routeTableName, firstList);
-            long id = entityList.get(retainCount).getId();
-            routeTableName = getBaseTableName() + getSplit() + id;
-            if (!isExistForTable(routeTableName)) {
-                createTable(routeTableName);
+        if (retainCount <= 0 || entityList.size() > retainCount) {
+            RLock lock = redisLock.getLock(CacheConstant.CREATE_SPLIT_TABLE_LOCK + getBaseTableName());
+            boolean getLock = redisLock.tryLock(lock, 30);
+            try {
+                log.info("获取创建表锁状态: {}", getLock);
+                if (!getLock) {
+                    return awaitTableLock(entityList, fn);
+                }
+                for (T entity : entityList) {
+                    entity.setId(IdWorker.getId());
+                }
+                // 如果当前表容量不足，新建表
+                String finalRouteTableName = getBaseTableName() + "_" + entityList.get(0).getId();
+                if (!isExistForTable(finalRouteTableName)) {
+                    createTable(finalRouteTableName);
+                }
+                // 创建表完毕后马上释放锁
+                lock.unlock();
+                getLock = false;
+                return fn.apply(finalRouteTableName, entityList);
+            } finally {
+                if (getLock) {
+                    lock.unlock();
+                }
             }
-            // 剩余列表
-            List<T> retainList = entityList.subList(retainCount, entityList.size());
-            return createAndInsertBatch(retainList, getMaxTableCount(), routeTableName, fn);
+        } else {
+            for (T entity : entityList) {
+                entity.setId(IdWorker.getId());
+            }
+            return fn.apply(routeTableName, entityList);
         }
-        return fn.apply(routeTableName, entityList);
+    }
+
+    /**
+     * 等待表创建完毕
+     *
+     * @param entityList
+     * @param fn
+     * @return
+     */
+    private boolean awaitTableLock(List<T> entityList, BiFunction<String, List<T>, Boolean> fn) {
+        // 如果没获取到锁，说明现在有其它线程在创建表，等待获取到锁的时候查询出最新的表
+        while (true) {
+            SleepUtil.milliseconds(200);
+            // 如果获取到锁，说明其它线程已经创建完毕
+            RLock lock = redisLock.getLock(CacheConstant.CREATE_SPLIT_TABLE_LOCK + getBaseTableName());
+            boolean getLock = redisLock.tryLock(lock, 3);
+            if (getLock) {
+                lock.unlock();
+                List<String> tableList = getTableList();
+                String lastTableName = tableList.get(tableList.size() - 1);
+                for (T entity : entityList) {
+                    entity.setId(IdWorker.getId());
+                }
+                return fn.apply(lastTableName, entityList);
+            }
+        }
     }
 
     private boolean isExistForTable(String tableName) {
@@ -245,7 +293,9 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
     }
 
     private int countForTable(String tableName) {
-        return baseMapper.countTable(getDatabase() + "." + tableName);
+        Map<String, Object> map = baseMapper.explainTable(tableName);
+        BigInteger rows = (BigInteger) map.get("rows");
+        return rows.intValue();
     }
 
     private String showCreateTable() {
@@ -257,20 +307,29 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
         String sql = showCreateTable();
         sql = sql.replace(getBaseTableName(), tableName);
         baseMapper.updateSQL(sql);
-        List<String> tableList = getTableList();
-        tableList.add(tableName);
-        SOFT_REFERENCE_MAP.put(getBaseTableName(), new SoftReference<>(tableList));
+        List<String> tableList = selectTableList();
+        log.info("baseTableName: {}, tableList: {}", getBaseTableName(), tableList);
+        String key = CacheConstant.SPLIT_TABLE_LIST + getBaseTableName();
+        this.setTableListCache(key, tableList);
+    }
+
+    private List<String> selectTableList() {
+        return baseMapper.getTableList(getDatabase(), getBaseTableName() + "%");
     }
 
     private List<String> getTableList() {
-        SoftReference<List<String>> softReference = SOFT_REFERENCE_MAP.get(getBaseTableName());
+        String key = CacheConstant.SPLIT_TABLE_LIST + getBaseTableName();
+        String value = redisService.get(key);
         List<String> tableList;
-        if (softReference == null || (tableList = softReference.get()) == null) {
-            tableList = Lists.newArrayList(getBaseTableName());
-            tableList.addAll(baseMapper.getTableList(getDatabase(), getBaseTableName() + getSplit() + "%"));
-            SOFT_REFERENCE_MAP.put(getBaseTableName(), new SoftReference<>(tableList));
+        if (value == null || (tableList = JacksonUtil.stringToList(value, String[].class)).isEmpty()) {
+            tableList = selectTableList();
+            this.setTableListCache(key, tableList);
         }
         return tableList;
+    }
+
+    private void setTableListCache(String key, List<String> tableList) {
+        redisService.set(key, JacksonUtil.objToString(tableList), TABLE_LIST_EXPIRED);
     }
 
     @Override
@@ -587,23 +646,17 @@ public abstract class BaseSplitTableServiceImpl<M extends SplitTableMapper<T>, T
         if (CollectionUtils.isEmpty(tableIdList) || id == null || id <= 0) {
             return tableName;
         }
-        int lastIndex = -1;
         for (int i = 0; i < tableIdList.size(); i++) {
-            if (id + 1 < tableIdList.get(i)) {
-                // 如果已经不是第一个元素，取上一张表，否则直接取默认表名
-                if (i - 1 >= 0) {
-                    tableName = assembleTableName(tableIdList, i - 1);
-                }
-                break;
-            }
-            // 如果id比最后一张表id还大，返回最后一张表
+            // 已经是最后一张表，说明id比最后一张表还大，返回最后一张表
             if (i == tableIdList.size() - 1) {
-                lastIndex = i;
+                return assembleTableName(tableIdList, i);
+            } else if (id < tableIdList.get(i)) {
+                // id比第一张表还小，直接返回主表
+                return tableName;
+            } else if (id >= tableIdList.get(i) && id < tableIdList.get(i + 1)) {
+                // id在当前表和下一张表之间，返回当前表
+                return assembleTableName(tableIdList, i);
             }
-        }
-
-        if (lastIndex > -1) {
-            tableName = assembleTableName(tableIdList, lastIndex);
         }
         return tableName;
     }

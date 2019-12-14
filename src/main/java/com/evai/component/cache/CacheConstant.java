@@ -64,6 +64,18 @@ public interface CacheConstant {
 
     long SECOND_OF_5 = 5L;
 
+    long SECOND_OF_AN_HOUR = 60 * 60L;
+
+    /**
+     * 创建分表锁
+     */
+    String CREATE_SPLIT_TABLE_LOCK = "create_split_table_lock:";
+
+    /**
+     * 所有分表列表
+     */
+    String SPLIT_TABLE_LIST = "split_table_list:";
+
     interface LuaScript {
         /**
          * 自增锁次数并设置过期时间

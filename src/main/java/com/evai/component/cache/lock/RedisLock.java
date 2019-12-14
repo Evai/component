@@ -27,11 +27,27 @@ public class RedisLock implements CacheLock {
     private final RedisTemplate<String, String> redisTemplate;
 
     @Override
+    public RLock getLock(String key) {
+        return redissonClient.getLock(key);
+    }
+
+    @Override
+    public boolean tryLock(RLock lock, long expired) {
+        try {
+            return lock.tryLock(0, expired, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("thread-{} interrupt", Thread.currentThread().getName());
+            return false;
+        }
+    }
+
+    @Override
     public <R> R tryLock(String key, long waitTime, long expired, Supplier<R> supplier) throws GetLockFailedException {
         RLock lock = redissonClient.getLock(key);
         boolean getLock = false;
         try {
-            getLock = lock.tryLock(0, expired, TimeUnit.SECONDS);
+            getLock = lock.tryLock(waitTime, expired, TimeUnit.SECONDS);
             if (!getLock) {
                 throw new GetLockFailedException();
             }

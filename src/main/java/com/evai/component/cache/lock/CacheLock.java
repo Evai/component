@@ -1,6 +1,7 @@
 package com.evai.component.cache.lock;
 
 import com.evai.component.cache.exception.GetLockFailedException;
+import org.redisson.api.RLock;
 
 import java.util.function.Supplier;
 
@@ -10,6 +11,16 @@ import java.util.function.Supplier;
  * @description redis分布式锁
  */
 public interface CacheLock {
+
+    RLock getLock(String key);
+    /**
+     * 获取锁
+     *
+     * @param lock
+     * @param expired
+     * @return
+     */
+    boolean tryLock(RLock lock, long expired);
 
     /**
      * 加锁并自动释放锁，尝试等待时间
