@@ -47,7 +47,7 @@ public class ComponentAutoConfiguration {
 
     @Bean
     public ExecutorService cacheExecutor(CacheProperties cacheProperties) {
-        return ThreadPoolUtil.newThreadPoolExecutor("redis-cacheExecutor", ThreadPoolUtil.CORE_POOL_SIZE, ThreadPoolUtil.CORE_POOL_SIZE * 2, 30L, TimeUnit.SECONDS, new LinkedBlockingQueue<>(500), new ThreadPoolExecutor.AbortPolicy());
+        return ThreadPoolUtil.newThreadPoolExecutor("redis-cacheExecutor", ThreadPoolUtil.CORE_POOL_SIZE, ThreadPoolUtil.CORE_POOL_SIZE * 2, 30L, TimeUnit.SECONDS, 500, new ThreadPoolExecutor.AbortPolicy());
     }
 
     @Bean
